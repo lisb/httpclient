@@ -37,6 +37,7 @@ import org.apache.http.HttpStatus;
 import org.apache.http.HttpVersion;
 import org.apache.http.StatusLine;
 import org.apache.http.client.cache.HttpCacheEntry;
+import org.apache.http.impl.client.cache.DateValueHeaders;
 import org.apache.http.impl.cookie.DateUtils;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.message.BasicStatusLine;
@@ -238,7 +239,8 @@ public class TestHttpCacheEntry {
         entry = new HttpCacheEntry(new Date(), new Date(), statusLine,
                 headers, mockResource);
         Header[] result = entry.getAllHeaders();
-        assertEquals(headers.length, result.length);
+        assertEquals(headers.length + DateValueHeaders.NUMBER_OF_EPOCH_HEADER, 
+        		result.length);
         for(int i=0; i<headers.length; i++) {
             assertEquals(headers[i], result[i]);
         }

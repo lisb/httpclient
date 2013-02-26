@@ -96,7 +96,7 @@ public class TestCacheEntryUpdater {
 
 
         Header[] updatedHeaders = updatedEntry.getAllHeaders();
-        assertEquals(2, updatedHeaders.length);
+        assertEquals(2 + DateValueHeaders.NUMBER_OF_EPOCH_HEADER, updatedHeaders.length);
         headersContain(updatedHeaders, "Date", formatDate(responseDate));
         headersContain(updatedHeaders, "ETag", "\"etag\"");
     }
@@ -120,7 +120,7 @@ public class TestCacheEntryUpdater {
 
         Header[] updatedHeaders = updatedEntry.getAllHeaders();
 
-        assertEquals(4, updatedHeaders.length);
+        assertEquals(4 + DateValueHeaders.NUMBER_OF_EPOCH_HEADER, updatedHeaders.length);
         headersContain(updatedHeaders, "Date", formatDate(requestDate));
         headersContain(updatedHeaders, "ETag", "\"etag\"");
         headersContain(updatedHeaders, "Last-Modified", DateUtils
@@ -144,7 +144,7 @@ public class TestCacheEntryUpdater {
                 new Date(), new Date(), response);
 
         Header[] updatedHeaders = updatedEntry.getAllHeaders();
-        assertEquals(4, updatedHeaders.length);
+        assertEquals(4 + DateValueHeaders.NUMBER_OF_EPOCH_HEADER, updatedHeaders.length);
 
         headersContain(updatedHeaders, "Date", formatDate(requestDate));
         headersContain(updatedHeaders, "ETag", "\"etag\"");
@@ -164,7 +164,7 @@ public class TestCacheEntryUpdater {
         response.setHeader("ETag", "\"old-etag\"");
         HttpCacheEntry result = impl.updateCacheEntry("A", entry, new Date(),
                 new Date(), response);
-        assertEquals(2, result.getAllHeaders().length);
+        assertEquals(2 + DateValueHeaders.NUMBER_OF_EPOCH_HEADER, result.getAllHeaders().length);
         headersContain(result.getAllHeaders(), "Date", formatDate(oneSecondAgo));
         headersContain(result.getAllHeaders(), "ETag", "\"new-etag\"");
     }

@@ -41,9 +41,6 @@ import org.apache.http.annotation.ThreadSafe;
 import org.apache.http.client.cache.HeaderConstants;
 import org.apache.http.client.cache.HttpCacheEntry;
 import org.apache.http.client.cache.HttpCacheStorage;
-import org.apache.http.impl.cookie.DateParseException;
-import org.apache.http.impl.cookie.DateUtils;
-import org.apache.http.protocol.HTTP;
 
 /**
  * Given a particular HttpRequest, flush any cache entries that this request
@@ -224,17 +221,12 @@ class CacheInvalidator {
 
     private boolean responseDateNewerThanEntryDate(HttpResponse response,
             HttpCacheEntry entry) {
-        Header entryDateHeader = entry.getFirstHeader(HTTP.DATE_HEADER);
-        Header responseDateHeader = response.getFirstHeader(HTTP.DATE_HEADER);
-        if (entryDateHeader == null || responseDateHeader == null) {
-            return false;
+        Date entryDate = DateValueHeaders.getDate(entry);
+        Date responseDate = DateValueHeaders.getDate(response);
+        if (entryDate == null || responseDate == null) {
+        	return false;
         }
-        try {
-            Date entryDate = DateUtils.parseDate(entryDateHeader.getValue());
-            Date responseDate = DateUtils.parseDate(responseDateHeader.getValue());
-            return responseDate.after(entryDate);
-        } catch (DateParseException e) {
-            return false;
-        }
+        
+        return responseDate.after(entryDate);
     }
 }

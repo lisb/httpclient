@@ -42,8 +42,6 @@ import org.apache.http.HttpStatus;
 import org.apache.http.HttpVersion;
 import org.apache.http.annotation.Immutable;
 import org.apache.http.client.cache.HeaderConstants;
-import org.apache.http.impl.cookie.DateParseException;
-import org.apache.http.impl.cookie.DateUtils;
 import org.apache.http.protocol.HTTP;
 
 /**
@@ -128,11 +126,9 @@ class ResponseCachingPolicy {
 
         if (dateHeaders.length != 1)
             return false;
-
-        try {
-            DateUtils.parseDate(dateHeaders[0].getValue());
-        } catch (DateParseException dpe) {
-            return false;
+        
+        if (DateValueHeaders.getDate(response) == null) {
+        	return false;
         }
 
         for (Header varyHdr : response.getHeaders(HeaderConstants.VARY)) {
@@ -243,16 +239,12 @@ class ResponseCachingPolicy {
     private boolean expiresHeaderLessOrEqualToDateHeaderAndNoCacheControl(
             HttpResponse response) {
         if (response.getFirstHeader(HeaderConstants.CACHE_CONTROL) != null) return false;
-        Header expiresHdr = response.getFirstHeader(HeaderConstants.EXPIRES);
-        Header dateHdr = response.getFirstHeader(HTTP.DATE_HEADER);
-        if (expiresHdr == null || dateHdr == null) return false;
-        try {
-            Date expires = DateUtils.parseDate(expiresHdr.getValue());
-            Date date = DateUtils.parseDate(dateHdr.getValue());
-            return expires.equals(date) || expires.before(date);
-        } catch (DateParseException dpe) {
-            return false;
+        Date expires = DateValueHeaders.getExpires(response);
+        Date date = DateValueHeaders.getDate(response);
+        if (expires == null || date == null) {
+        	return false;
         }
+        return expires.equals(date) || expires.before(date);
     }
 
     private boolean from1_0Origin(HttpResponse response) {

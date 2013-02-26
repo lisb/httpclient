@@ -61,12 +61,9 @@ import org.apache.http.client.cache.ResourceFactory;
 import org.apache.http.client.methods.HttpUriRequest;
 import org.apache.http.conn.ClientConnectionManager;
 import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.impl.cookie.DateParseException;
-import org.apache.http.impl.cookie.DateUtils;
 import org.apache.http.message.BasicHttpResponse;
 import org.apache.http.params.HttpParams;
 import org.apache.http.protocol.ExecutionContext;
-import org.apache.http.protocol.HTTP;
 import org.apache.http.protocol.HttpContext;
 import org.apache.http.util.EntityUtils;
 import org.apache.http.util.VersionInfo;
@@ -726,21 +723,10 @@ public class CachingHttpClient implements HttpClient {
 
     private boolean revalidationResponseIsTooOld(HttpResponse backendResponse,
             HttpCacheEntry cacheEntry) {
-        final Header entryDateHeader = cacheEntry.getFirstHeader(HTTP.DATE_HEADER);
-        final Header responseDateHeader = backendResponse.getFirstHeader(HTTP.DATE_HEADER);
-        if (entryDateHeader != null && responseDateHeader != null) {
-            try {
-                Date entryDate = DateUtils.parseDate(entryDateHeader.getValue());
-                Date respDate = DateUtils.parseDate(responseDateHeader.getValue());
-                if (respDate.before(entryDate)) return true;
-            } catch (DateParseException e) {
-                // either backend response or cached entry did not have a valid
-                // Date header, so we can't tell if they are out of order
-                // according to the origin clock; thus we can skip the
-                // unconditional retry recommended in 13.2.6 of RFC 2616.
-            }
-        }
-        return false;
+        Date entryDate = DateValueHeaders.getDate(cacheEntry);
+        Date respDate = DateValueHeaders.getDate(backendResponse);
+        if (entryDate == null || respDate == null) return false;
+        return respDate.before(entryDate);
     }
 
     HttpResponse negotiateResponseFromVariants(HttpHost target,
@@ -931,18 +917,11 @@ public class CachingHttpClient implements HttpClient {
             // nop
         }
         if (existing == null) return false;
-        Header entryDateHeader = existing.getFirstHeader(HTTP.DATE_HEADER);
-        if (entryDateHeader == null) return false;
-        Header responseDateHeader = backendResponse.getFirstHeader(HTTP.DATE_HEADER);
-        if (responseDateHeader == null) return false;
-        try {
-            Date entryDate = DateUtils.parseDate(entryDateHeader.getValue());
-            Date responseDate = DateUtils.parseDate(responseDateHeader.getValue());
-            return responseDate.before(entryDate);
-        } catch (DateParseException e) {
-            // Empty on Purpose
-        }
-        return false;
+        Date entryDate = DateValueHeaders.getDate(existing);
+        if (entryDate == null) return false;
+        Date responseDate = DateValueHeaders.getDate(backendResponse);
+        if (responseDate == null) return false;
+        return responseDate.before(entryDate);
     }
 
 }

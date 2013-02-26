@@ -27,15 +27,19 @@
 package org.apache.http.client.cache;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+
 import org.apache.http.Header;
 import org.apache.http.HttpResponse;
 import org.apache.http.ProtocolVersion;
 import org.apache.http.StatusLine;
 import org.apache.http.annotation.Immutable;
+import org.apache.http.impl.client.cache.DateValueHeaders;
 import org.apache.http.message.HeaderGroup;
 
 /**
@@ -101,8 +105,14 @@ public class HttpCacheEntry implements Serializable {
         this.responseDate = responseDate;
         this.statusLine = statusLine;
         this.responseHeaders = new HeaderGroup();
-        this.responseHeaders.setHeaders(responseHeaders);
-        this.resource = resource;
+        
+        final List<Header> responseEpochHeaders = new ArrayList<Header>();
+        Collections.addAll(responseEpochHeaders, responseHeaders);
+        DateValueHeaders.assureEpochHeaders(responseEpochHeaders);
+		this.responseHeaders.setHeaders(responseEpochHeaders
+				.toArray(new Header[responseEpochHeaders.size()]));
+        
+		this.resource = resource;
         this.variantMap = variantMap != null
             ? new HashMap<String,String>(variantMap)
             : null;

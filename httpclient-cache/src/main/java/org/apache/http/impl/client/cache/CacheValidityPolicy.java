@@ -34,8 +34,6 @@ import org.apache.http.HttpRequest;
 import org.apache.http.annotation.Immutable;
 import org.apache.http.client.cache.HeaderConstants;
 import org.apache.http.client.cache.HttpCacheEntry;
-import org.apache.http.impl.cookie.DateParseException;
-import org.apache.http.impl.cookie.DateUtils;
 import org.apache.http.protocol.HTTP;
 
 /**
@@ -169,27 +167,11 @@ class CacheValidityPolicy {
     }
 
     protected Date getDateValue(final HttpCacheEntry entry) {
-        Header dateHdr = entry.getFirstHeader(HTTP.DATE_HEADER);
-        if (dateHdr == null)
-            return null;
-        try {
-            return DateUtils.parseDate(dateHdr.getValue());
-        } catch (DateParseException dpe) {
-            // ignore malformed date
-        }
-        return null;
+        return DateValueHeaders.getDate(entry);
     }
 
     protected Date getLastModifiedValue(final HttpCacheEntry entry) {
-        Header dateHdr = entry.getFirstHeader(HeaderConstants.LAST_MODIFIED);
-        if (dateHdr == null)
-            return null;
-        try {
-            return DateUtils.parseDate(dateHdr.getValue());
-        } catch (DateParseException dpe) {
-            // ignore malformed date
-        }
-        return null;
+        return DateValueHeaders.getLastModified(entry);
     }
 
     protected long getContentLengthValue(final HttpCacheEntry entry) {
@@ -288,15 +270,7 @@ class CacheValidityPolicy {
     }
 
     protected Date getExpirationDate(final HttpCacheEntry entry) {
-        Header expiresHeader = entry.getFirstHeader(HeaderConstants.EXPIRES);
-        if (expiresHeader == null)
-            return null;
-        try {
-            return DateUtils.parseDate(expiresHeader.getValue());
-        } catch (DateParseException dpe) {
-            // malformed expires header
-        }
-        return null;
+        return DateValueHeaders.getExpires(entry);
     }
 
     public boolean hasCacheControlDirective(final HttpCacheEntry entry,
