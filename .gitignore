@@ -5,3 +5,4 @@ bin
 .clover
 .externalToolBuilders
 target
+maven-eclipse.xml
