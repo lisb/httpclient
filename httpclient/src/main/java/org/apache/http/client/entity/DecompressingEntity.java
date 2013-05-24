@@ -45,8 +45,8 @@ abstract class DecompressingEntity extends HttpEntityWrapper {
     private static final int BUFFER_SIZE = 1024 * 2;
 
     /**
-     * DecompressingEntities are not repeatable, so they will return the same
-     * InputStream instance when {@link #getContent()} is called.
+     * {@link #getContent()} method must return the same {@link InputStream}
+     * instance when DecompressingEntity is wrapping a streaming entity.
      */
     private InputStream content;
 
@@ -60,7 +60,17 @@ abstract class DecompressingEntity extends HttpEntityWrapper {
         super(wrapped);
     }
 
-    abstract InputStream getDecompressingInputStream(final InputStream wrapped) throws IOException;
+    abstract InputStream decorate(final InputStream wrapped) throws IOException;
+
+    private InputStream getDecompressingStream() throws IOException {
+        InputStream in = wrappedEntity.getContent();
+        try {
+            return decorate(in);
+        } catch (IOException ex) {
+            in.close();
+            throw ex;
+        }
+    }
 
     /**
      * {@inheritDoc}
@@ -69,11 +79,11 @@ abstract class DecompressingEntity extends HttpEntityWrapper {
     public InputStream getContent() throws IOException {
         if (wrappedEntity.isStreaming()) {
             if (content == null) {
-                content = getDecompressingInputStream(wrappedEntity.getContent());
+                content = getDecompressingStream();
             }
             return content;
         } else {
-            return getDecompressingInputStream(wrappedEntity.getContent());
+            return getDecompressingStream();
         }
     }
 
@@ -88,9 +98,7 @@ abstract class DecompressingEntity extends HttpEntityWrapper {
         InputStream instream = getContent();
         try {
             byte[] buffer = new byte[BUFFER_SIZE];
-
             int l;
-
             while ((l = instream.read(buffer)) != -1) {
                 outstream.write(buffer, 0, l);
             }

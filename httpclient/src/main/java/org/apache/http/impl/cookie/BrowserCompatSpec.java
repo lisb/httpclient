@@ -40,6 +40,8 @@ import org.apache.http.cookie.Cookie;
 import org.apache.http.cookie.CookieOrigin;
 import org.apache.http.cookie.MalformedCookieException;
 import org.apache.http.cookie.SM;
+import org.apache.http.message.BasicHeaderElement;
+import org.apache.http.message.BasicHeaderValueFormatter;
 import org.apache.http.message.BufferedHeader;
 import org.apache.http.message.ParserCursor;
 import org.apache.http.util.CharArrayBuffer;
@@ -89,6 +91,7 @@ public class BrowserCompatSpec extends CookieSpecBase {
         registerAttribHandler(ClientCookie.COMMENT_ATTR, new BasicCommentHandler());
         registerAttribHandler(ClientCookie.EXPIRES_ATTR, new BasicExpiresHandler(
                 this.datepatterns));
+        registerAttribHandler(ClientCookie.VERSION_ATTR, new BrowserCompatVersionAttributeHandler());
     }
 
     /** Default constructor */
@@ -160,11 +163,21 @@ public class BrowserCompatSpec extends CookieSpecBase {
             if (i > 0) {
                 buffer.append("; ");
             }
-            buffer.append(cookie.getName());
-            buffer.append("=");
-            String s = cookie.getValue();
-            if (s != null) {
-                buffer.append(s);
+            String cookieName = cookie.getName();
+            String cookieValue = cookie.getValue();
+            if (cookie.getVersion() > 0 &&
+                    !(cookieValue.startsWith("\"") && cookieValue.endsWith("\""))) {
+                BasicHeaderValueFormatter.DEFAULT.formatHeaderElement(
+                        buffer,
+                        new BasicHeaderElement(cookieName, cookieValue),
+                        false);
+            } else {
+                // Netscape style cookies do not support quoted values
+                buffer.append(cookieName);
+                buffer.append("=");
+                if (cookieValue != null) {
+                    buffer.append(cookieValue);
+                }
             }
         }
         List<Header> headers = new ArrayList<Header>(1);

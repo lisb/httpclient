@@ -27,6 +27,7 @@ package org.apache.http.impl.client;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.net.URI;
 
 import org.apache.http.Header;
 import org.apache.http.HttpClientConnection;
@@ -42,6 +43,7 @@ import org.apache.http.client.NonRepeatableRequestException;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.params.ClientPNames;
+import org.apache.http.client.utils.URIBuilder;
 import org.apache.http.entity.InputStreamEntity;
 import org.apache.http.entity.StringEntity;
 import org.apache.http.localserver.BasicServerTestBase;
@@ -52,6 +54,8 @@ import org.apache.http.protocol.HttpContext;
 import org.apache.http.protocol.HttpRequestExecutor;
 import org.apache.http.protocol.HttpRequestHandler;
 import org.apache.http.util.EntityUtils;
+import org.apache.http.impl.client.DefaultHttpClient;
+
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -105,7 +109,6 @@ public class TestDefaultClientRequestDirector extends BasicServerTestBase {
     @Test
     public void testDefaultHostHeader() throws Exception {
         int port = this.localServer.getServiceAddress().getPort();
-        String hostname = getServerHttp().getHostName();
         this.localServer.register("*", new SimpleService());
 
         HttpContext context = new BasicHttpContext();
@@ -124,7 +127,7 @@ public class TestDefaultClientRequestDirector extends BasicServerTestBase {
         Header[] headers = reqWrapper.getHeaders("host");
         Assert.assertNotNull(headers);
         Assert.assertEquals(1, headers.length);
-        Assert.assertEquals(hostname + ":" + port, headers[0].getValue());
+        Assert.assertEquals("localhost:" + port, headers[0].getValue());
     }
 
     @Test
@@ -358,6 +361,64 @@ public class TestDefaultClientRequestDirector extends BasicServerTestBase {
             Assert.assertEquals(failureMsg, nonRepeat.getCause().getMessage());
             throw ex;
         }
+    }
+
+    @Test
+    public void testDefaultPortVirtualHost() throws Exception {
+        this.localServer.register("*", new SimpleService());
+        this.httpclient = new DefaultHttpClient();
+        HttpHost target = getServerHttp();
+        HttpHost hostHost = new HttpHost(target.getHostName(),-1,target.getSchemeName());
+
+        httpclient.getParams().setParameter(ClientPNames.DEFAULT_HOST,target);
+        httpclient.getParams().setParameter(ClientPNames.VIRTUAL_HOST,hostHost);
+
+        HttpGet httpget = new HttpGet("/stuff");
+        HttpContext context = new BasicHttpContext();
+
+        HttpResponse response = this.httpclient.execute(null, httpget, context);
+        Assert.assertEquals(HttpStatus.SC_OK, response.getStatusLine().getStatusCode());
+        EntityUtils.consume(response.getEntity());
+    }
+
+    @Test
+    public void testRelativeRequestURIWithFragment() throws Exception {
+        this.localServer.register("*", new SimpleService());
+        HttpHost target = getServerHttp();
+
+        HttpGet httpget = new HttpGet("/stuff#blahblah");
+        HttpContext context = new BasicHttpContext();
+
+        HttpResponse response = this.httpclient.execute(target, httpget, context);
+        Assert.assertEquals(HttpStatus.SC_OK, response.getStatusLine().getStatusCode());
+        EntityUtils.consume(response.getEntity());
+
+        HttpRequest request = (HttpRequest) context.getAttribute(ExecutionContext.HTTP_REQUEST);
+        Assert.assertEquals("/stuff", request.getRequestLine().getUri());
+    }
+
+    @Test
+    public void testAbsoluteRequestURIWithFragment() throws Exception {
+        this.localServer.register("*", new SimpleService());
+        HttpHost target = getServerHttp();
+
+        URI uri = new URIBuilder()
+            .setHost(target.getHostName())
+            .setPort(target.getPort())
+            .setScheme(target.getSchemeName())
+            .setPath("/stuff")
+            .setFragment("blahblah")
+            .build();
+
+        HttpGet httpget = new HttpGet(uri);
+        HttpContext context = new BasicHttpContext();
+
+        HttpResponse response = this.httpclient.execute(httpget, context);
+        Assert.assertEquals(HttpStatus.SC_OK, response.getStatusLine().getStatusCode());
+        EntityUtils.consume(response.getEntity());
+
+        HttpRequest request = (HttpRequest) context.getAttribute(ExecutionContext.HTTP_REQUEST);
+        Assert.assertEquals("/stuff", request.getRequestLine().getUri());
     }
 
 }

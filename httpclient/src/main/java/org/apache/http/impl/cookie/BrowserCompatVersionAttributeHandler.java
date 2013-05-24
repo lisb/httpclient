@@ -24,36 +24,44 @@
  * <http://www.apache.org/>.
  *
  */
-package org.apache.http.impl.client.cache;
 
-import java.io.ByteArrayInputStream;
+package org.apache.http.impl.cookie;
 
-import org.apache.http.client.cache.Resource;
-import org.apache.http.util.EntityUtils;
-import org.easymock.classextension.EasyMock;
-import org.junit.Assert;
-import org.junit.Test;
+import org.apache.http.annotation.Immutable;
+import org.apache.http.cookie.MalformedCookieException;
+import org.apache.http.cookie.SetCookie;
 
-public class TestCombinedEntity {
+/**
+ * <tt>"Version"</tt> cookie attribute handler for BrowserCompat cookie spec.
+ *
+ * @since 4.3
+ */
+@Immutable
+class BrowserCompatVersionAttributeHandler extends
+		AbstractCookieAttributeHandler {
 
-    @Test
-    public void testCombinedEntityBasics() throws Exception {
-        Resource resource = EasyMock.createNiceMock(Resource.class);
-        EasyMock.expect(resource.getInputStream()).andReturn(
-                new ByteArrayInputStream(new byte[] { 1, 2, 3, 4, 5 }));
-        resource.dispose();
-        EasyMock.replay(resource);
+	public BrowserCompatVersionAttributeHandler() {
+		super();
+	}
 
-        ByteArrayInputStream instream = new ByteArrayInputStream(new byte[] { 6, 7, 8, 9, 10 });
-        CombinedEntity entity = new CombinedEntity(resource, instream);
-        Assert.assertEquals(-1, entity.getContentLength());
-        Assert.assertFalse(entity.isRepeatable());
-        Assert.assertTrue(entity.isStreaming());
-
-        byte[] result = EntityUtils.toByteArray(entity);
-        Assert.assertArrayEquals(new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, result);
-
-        EasyMock.verify(resource);
-    }
+	/**
+	 * Parse cookie version attribute.
+	 */
+	public void parse(final SetCookie cookie, final String value)
+			throws MalformedCookieException {
+		if (cookie == null) {
+			throw new IllegalArgumentException("Cookie may not be null");
+		}
+		if (value == null) {
+			throw new MalformedCookieException("Missing value for version attribute");
+		}
+		int version = 0;
+		try {
+			version = Integer.parseInt(value);
+		} catch (NumberFormatException e) {
+			// Just ignore invalid versions
+		}
+		cookie.setVersion(version);
+	}
 
 }

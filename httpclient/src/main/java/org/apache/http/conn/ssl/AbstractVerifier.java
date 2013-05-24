@@ -43,8 +43,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.StringTokenizer;
-import java.util.logging.Logger;
-import java.util.logging.Level;
 
 import javax.net.ssl.SSLException;
 import javax.net.ssl.SSLSession;
@@ -180,12 +178,12 @@ public abstract class AbstractVerifier implements X509HostnameVerifier {
 
         // We're can be case-insensitive when comparing the host we used to
         // establish the socket to the hostname in the certificate.
-        String hostName = host.trim().toLowerCase(Locale.ENGLISH);
+        String hostName = host.trim().toLowerCase(Locale.US);
         boolean match = false;
         for(Iterator<String> it = names.iterator(); it.hasNext();) {
             // Don't trim the CN, though!
             String cn = it.next();
-            cn = cn.toLowerCase(Locale.ENGLISH);
+            cn = cn.toLowerCase(Locale.US);
             // Store CN in StringBuilder in case we need to report an error.
             buf.append(" <");
             buf.append(cn);
@@ -204,9 +202,10 @@ public abstract class AbstractVerifier implements X509HostnameVerifier {
                                  !isIPAddress(host);
 
             if(doWildcard) {
-                if (parts[0].length() > 1) { // e.g. server*
-                    String prefix = parts[0].substring(0, parts.length-2); // e.g. server
-                    String suffix = cn.substring(parts[0].length()); // skip wildcard part from cn
+                String firstpart = parts[0];
+                if (firstpart.length() > 1) { // e.g. server*
+                    String prefix = firstpart.substring(0, firstpart.length() - 1); // e.g. server
+                    String suffix = cn.substring(firstpart.length()); // skip wildcard part from cn
                     String hostSuffix = hostName.substring(prefix.length()); // skip wildcard part from host
                     match = hostName.startsWith(prefix) && hostSuffix.endsWith(suffix);
                 } else {
@@ -261,13 +260,15 @@ public abstract class AbstractVerifier implements X509HostnameVerifier {
            Looks like toString() even works with non-ascii domain names!
            I tested it with "&#x82b1;&#x5b50;.co.jp" and it worked fine.
         */
+
         String subjectPrincipal = cert.getSubjectX500Principal().toString();
         StringTokenizer st = new StringTokenizer(subjectPrincipal, ",");
         while(st.hasMoreTokens()) {
-            String tok = st.nextToken();
-            int x = tok.indexOf("CN=");
-            if(x >= 0) {
-                cnList.add(tok.substring(x + 3));
+            String tok = st.nextToken().trim();
+            if (tok.length() > 3) {
+                if (tok.substring(0, 3).equalsIgnoreCase("CN=")) {
+                    cnList.add(tok.substring(3));
+                }
             }
         }
         if(!cnList.isEmpty()) {
@@ -302,8 +303,6 @@ public abstract class AbstractVerifier implements X509HostnameVerifier {
             c = cert.getSubjectAlternativeNames();
         }
         catch(CertificateParsingException cpe) {
-            Logger.getLogger(AbstractVerifier.class.getName())
-                    .log(Level.FINE, "Error parsing certificate.", cpe);
         }
         if(c != null) {
             for (List<?> aC : c) {

@@ -112,7 +112,7 @@ public class PoolingClientConnectionManager implements ClientConnectionManager, 
         this.schemeRegistry = schemeRegistry;
         this.dnsResolver  = dnsResolver;
         this.operator = createConnectionOperator(schemeRegistry);
-        this.pool = new HttpConnPool(this.log, 2, 20, timeToLive, tunit);
+        this.pool = new HttpConnPool(this.log, this.operator, 2, 20, timeToLive, tunit);
     }
 
     @Override
@@ -229,7 +229,7 @@ public class PoolingClientConnectionManager implements ClientConnectionManager, 
             // Should never happen
             throw new InterruptedException();
         } catch (TimeoutException ex) {
-            throw new ConnectionPoolTimeoutException("Timeout waiting for connection");
+            throw new ConnectionPoolTimeoutException("Timeout waiting for connection from pool");
         }
     }
 
@@ -261,15 +261,18 @@ public class PoolingClientConnectionManager implements ClientConnectionManager, 
                         }
                     }
                 }
-                entry.updateExpiry(keepalive, tunit != null ? tunit : TimeUnit.MILLISECONDS);
-                if (this.log.isDebugEnabled()) {
-                    String s;
-                    if (keepalive > 0) {
-                        s = "for " + keepalive + " " + tunit;
-                    } else {
-                        s = "indefinitely";
+                // Only reusable connections can be kept alive
+                if (managedConn.isMarkedReusable()) {
+                    entry.updateExpiry(keepalive, tunit != null ? tunit : TimeUnit.MILLISECONDS);
+                    if (this.log.isDebugEnabled()) {
+                        String s;
+                        if (keepalive > 0) {
+                            s = "for " + keepalive + " " + tunit;
+                        } else {
+                            s = "indefinitely";
+                        }
+                        this.log.debug("Connection " + format(entry) + " can be kept alive " + s);
                     }
-                    this.log.debug("Connection " + format(entry) + " can be kept alive " + s);
                 }
             } finally {
                 this.pool.release(entry, managedConn.isMarkedReusable());

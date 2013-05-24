@@ -24,36 +24,45 @@
  * <http://www.apache.org/>.
  *
  */
-package org.apache.http.impl.client.cache;
 
-import java.io.ByteArrayInputStream;
+package org.apache.http.client.entity;
 
-import org.apache.http.client.cache.Resource;
-import org.apache.http.util.EntityUtils;
-import org.easymock.classextension.EasyMock;
-import org.junit.Assert;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.concurrent.atomic.AtomicBoolean;
+
+import junit.framework.Assert;
+
+import org.apache.http.HttpEntity;
+import org.apache.http.entity.InputStreamEntity;
 import org.junit.Test;
 
-public class TestCombinedEntity {
+public class TestGZip {
 
     @Test
-    public void testCombinedEntityBasics() throws Exception {
-        Resource resource = EasyMock.createNiceMock(Resource.class);
-        EasyMock.expect(resource.getInputStream()).andReturn(
-                new ByteArrayInputStream(new byte[] { 1, 2, 3, 4, 5 }));
-        resource.dispose();
-        EasyMock.replay(resource);
+    public void testGzipDecompressingEntityDoesNotCrashInConstructorAndLeaveInputStreamOpen()
+            throws Exception {
+        final AtomicBoolean inputStreamIsClosed = new AtomicBoolean(false);
+        HttpEntity in = new InputStreamEntity(new InputStream() {
+            @Override
+            public int read() throws IOException {
+                throw new IOException("An exception occurred");
+            }
 
-        ByteArrayInputStream instream = new ByteArrayInputStream(new byte[] { 6, 7, 8, 9, 10 });
-        CombinedEntity entity = new CombinedEntity(resource, instream);
-        Assert.assertEquals(-1, entity.getContentLength());
-        Assert.assertFalse(entity.isRepeatable());
-        Assert.assertTrue(entity.isStreaming());
+            @Override
+            public void close() throws IOException {
+                inputStreamIsClosed.set(true);
+            }
 
-        byte[] result = EntityUtils.toByteArray(entity);
-        Assert.assertArrayEquals(new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, result);
-
-        EasyMock.verify(resource);
+        }, 123);
+        GzipDecompressingEntity gunzipe = new GzipDecompressingEntity(in);
+        try {
+            gunzipe.getContent();
+        } catch (IOException e) {
+            // As I cannot get the content, GzipDecompressingEntity is supposed
+            // to have released everything
+            Assert.assertTrue(inputStreamIsClosed.get());
+        }
     }
 
 }

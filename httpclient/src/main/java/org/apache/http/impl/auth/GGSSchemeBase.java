@@ -31,12 +31,13 @@ import org.apache.commons.logging.LogFactory;
 import org.apache.http.Header;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpRequest;
+import org.apache.http.auth.AUTH;
 import org.apache.http.auth.AuthenticationException;
 import org.apache.http.auth.ContextAwareAuthScheme;
 import org.apache.http.auth.Credentials;
 import org.apache.http.auth.InvalidCredentialsException;
 import org.apache.http.auth.MalformedChallengeException;
-import org.apache.http.message.BasicHeader;
+import org.apache.http.message.BufferedHeader;
 import org.apache.http.protocol.ExecutionContext;
 import org.apache.http.protocol.HttpContext;
 import org.apache.http.util.CharArrayBuffer;
@@ -60,8 +61,8 @@ public abstract class GGSSchemeBase extends AuthSchemeBase {
 
     private final Log log = LogFactory.getLog(getClass());
 
-    private final boolean stripPort;
     private final Base64 base64codec;
+    private final boolean stripPort;
 
     /** Authentication process state */
     private State state;
@@ -71,9 +72,9 @@ public abstract class GGSSchemeBase extends AuthSchemeBase {
 
     GGSSchemeBase(boolean stripPort) {
         super();
-        this.base64codec = new Base64();
-        this.state = State.UNINITIATED;
+        this.base64codec = new Base64(0);
         this.stripPort = stripPort;
+        this.state = State.UNINITIATED;
     }
 
     GGSSchemeBase() {
@@ -109,7 +110,7 @@ public abstract class GGSSchemeBase extends AuthSchemeBase {
     /**
      * @deprecated (4.2) Use {@link ContextAwareAuthScheme#authenticate(Credentials, HttpRequest, org.apache.http.protocol.HttpContext)}
      */
-    @Deprecated 
+    @Deprecated
     public Header authenticate(
             final Credentials credentials,
             final HttpRequest request) throws AuthenticationException {
@@ -173,7 +174,15 @@ public abstract class GGSSchemeBase extends AuthSchemeBase {
             if (log.isDebugEnabled()) {
                 log.debug("Sending response '" + tokenstr + "' back to the auth server");
             }
-            return new BasicHeader("Authorization", "Negotiate " + tokenstr);
+            CharArrayBuffer buffer = new CharArrayBuffer(32);
+            if (isProxy()) {
+                buffer.append(AUTH.PROXY_AUTH_RESP);
+            } else {
+                buffer.append(AUTH.WWW_AUTH_RESP);
+            }
+            buffer.append(": Negotiate ");
+            buffer.append(tokenstr);
+            return new BufferedHeader(buffer);
         default:
             throw new IllegalStateException("Illegal state: " + state);
         }
@@ -188,7 +197,7 @@ public abstract class GGSSchemeBase extends AuthSchemeBase {
             log.debug("Received challenge '" + challenge + "' from the auth server");
         }
         if (state == State.UNINITIATED) {
-            token = base64codec.decode(challenge.getBytes());
+            token = Base64.decodeBase64(challenge.getBytes());
             state = State.CHALLENGE_RECEIVED;
         } else {
             log.debug("Authentication already attempted");

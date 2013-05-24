@@ -34,6 +34,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import junit.framework.AssertionFailedError;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
@@ -115,25 +116,25 @@ public class TestCachingHttpClient {
     @SuppressWarnings("unchecked")
     @Before
     public void setUp() {
-        mockRequestPolicy = createMock(CacheableRequestPolicy.class);
-        mockValidityPolicy = createMock(CacheValidityPolicy.class);
-        mockBackend = createMock(HttpClient.class);
-        mockCache = createMock(HttpCache.class);
-        mockSuitabilityChecker = createMock(CachedResponseSuitabilityChecker.class);
-        mockResponsePolicy = createMock(ResponseCachingPolicy.class);
-        mockConnectionManager = createMock(ClientConnectionManager.class);
-        mockHandler = createMock(ResponseHandler.class);
-        mockBackendResponse = createMock(HttpResponse.class);
-        mockUriRequest = createMock(HttpUriRequest.class);
-        mockCacheEntry = createMock(HttpCacheEntry.class);
-        mockResponseGenerator = createMock(CachedHttpResponseGenerator.class);
-        mockCachedResponse = createMock(HttpResponse.class);
-        mockConditionalRequestBuilder = createMock(ConditionalRequestBuilder.class);
-        mockConditionalRequest = createMock(HttpRequest.class);
-        mockStatusLine = createMock(StatusLine.class);
-        mockResponseProtocolCompliance = createMock(ResponseProtocolCompliance.class);
-        mockRequestProtocolCompliance = createMock(RequestProtocolCompliance.class);
-        mockStorage = createMock(HttpCacheStorage.class);
+        mockRequestPolicy = createNiceMock(CacheableRequestPolicy.class);
+        mockValidityPolicy = createNiceMock(CacheValidityPolicy.class);
+        mockBackend = createNiceMock(HttpClient.class);
+        mockCache = createNiceMock(HttpCache.class);
+        mockSuitabilityChecker = createNiceMock(CachedResponseSuitabilityChecker.class);
+        mockResponsePolicy = createNiceMock(ResponseCachingPolicy.class);
+        mockConnectionManager = createNiceMock(ClientConnectionManager.class);
+        mockHandler = createNiceMock(ResponseHandler.class);
+        mockBackendResponse = createNiceMock(HttpResponse.class);
+        mockUriRequest = createNiceMock(HttpUriRequest.class);
+        mockCacheEntry = createNiceMock(HttpCacheEntry.class);
+        mockResponseGenerator = createNiceMock(CachedHttpResponseGenerator.class);
+        mockCachedResponse = createNiceMock(HttpResponse.class);
+        mockConditionalRequestBuilder = createNiceMock(ConditionalRequestBuilder.class);
+        mockConditionalRequest = createNiceMock(HttpRequest.class);
+        mockStatusLine = createNiceMock(StatusLine.class);
+        mockResponseProtocolCompliance = createNiceMock(ResponseProtocolCompliance.class);
+        mockRequestProtocolCompliance = createNiceMock(RequestProtocolCompliance.class);
+        mockStorage = createNiceMock(HttpCacheStorage.class);
 
         requestDate = new Date(System.currentTimeMillis() - 1000);
         responseDate = new Date();
@@ -1079,6 +1080,33 @@ public class TestCachingHttpClient {
 
     }
 
+	@Test
+	public void testReturns304ForIfModifiedSinceHeaderIf304ResponseInCache() throws Exception {
+		Date now = new Date();
+		Date oneHourAgo = new Date(now.getTime() - 3600 * 1000L);
+		Date inTenMinutes = new Date(now.getTime() + 600 * 1000L);
+		impl = new CachingHttpClient(mockBackend);
+		HttpRequest req1 = new HttpGet("http://foo.example.com/");
+		req1.addHeader("If-Modified-Since", DateUtils.formatDate(oneHourAgo));
+		HttpRequest req2 = new HttpGet("http://foo.example.com/");
+		req2.addHeader("If-Modified-Since", DateUtils.formatDate(oneHourAgo));
+
+		HttpResponse resp1 = new BasicHttpResponse(HttpVersion.HTTP_1_1, HttpStatus.SC_NOT_MODIFIED, "Not modified");
+		resp1.setHeader("Date", DateUtils.formatDate(now));
+		resp1.setHeader("Cache-control", "max-age=600");
+		resp1.setHeader("Expires", DateUtils.formatDate(inTenMinutes));
+
+		expect(mockBackend.execute(isA(HttpHost.class), isA(HttpRequest.class), (HttpContext) isNull())).andReturn(resp1).once();
+		expect(mockBackend.execute(isA(HttpHost.class), isA(HttpRequest.class), (HttpContext) isNull())).andThrow(new AssertionFailedError("Should have reused cached 304 response")).anyTimes();
+
+		replayMocks();
+		impl.execute(host, req1);
+		HttpResponse result = impl.execute(host, req2);
+		verifyMocks();
+		Assert.assertEquals(HttpStatus.SC_NOT_MODIFIED, result.getStatusLine().getStatusCode());
+		Assert.assertFalse(result.containsHeader("Last-Modified"));
+	}
+
     @Test
     public void testReturns200ForIfModifiedSinceDateIsLess() throws Exception {
         Date now = new Date();
@@ -2015,7 +2043,175 @@ public class TestCachingHttpClient {
 		impl.execute(host, request);
 		assertEquals(1, backend.getExecutions());
 	}
-	
+
+    @Test
+    public void testNoEntityForIfNoneMatchRequestNotYetInCache() throws Exception {
+
+        Date now = new Date();
+        Date tenSecondsAgo = new Date(now.getTime() - 10 * 1000L);
+
+        impl = new CachingHttpClient(mockBackend);
+        HttpRequest req1 = new HttpGet("http://foo.example.com/");
+        req1.addHeader("If-None-Match", "\"etag\"");
+
+        HttpResponse resp1 = new BasicHttpResponse(HttpVersion.HTTP_1_1,
+                HttpStatus.SC_NOT_MODIFIED, "Not modified");
+        resp1.setHeader("Content-Length", "128");
+        resp1.setHeader("ETag", "\"etag\"");
+        resp1.setHeader("Date", DateUtils.formatDate(tenSecondsAgo));
+        resp1.setHeader("Cache-Control", "public, max-age=5");
+
+        expect(
+                mockBackend.execute(isA(HttpHost.class),
+                        isA(HttpRequest.class), (HttpContext)
+                        isNull())).andReturn(resp1);
+        
+        replayMocks();
+        HttpResponse result = impl.execute(host, req1);
+        verifyMocks();
+
+        assertEquals(HttpStatus.SC_NOT_MODIFIED, result.getStatusLine()
+                .getStatusCode());
+        assertNull("The 304 response messages MUST NOT contain a message-body",
+                result.getEntity());
+    }
+
+    @Test
+    public void testNotModifiedResponseUpdatesCacheEntryWhenNoEntity() throws Exception {
+
+        Date now = new Date();
+
+        impl = new CachingHttpClient(mockBackend);
+
+        HttpRequest req1 = new HttpGet("http://foo.example.com/");
+        req1.addHeader("If-None-Match", "etag");
+
+        HttpRequest req2 = new HttpGet("http://foo.example.com/");
+        req2.addHeader("If-None-Match", "etag");
+
+        HttpResponse resp1 = new BasicHttpResponse(HttpVersion.HTTP_1_1, HttpStatus.SC_NOT_MODIFIED, "Not modified");
+        resp1.setHeader("Date", DateUtils.formatDate(now));
+        resp1.setHeader("Cache-Control","max-age=0");
+        resp1.setHeader("Etag", "etag");
+
+        HttpResponse resp2 = new BasicHttpResponse(HttpVersion.HTTP_1_1, HttpStatus.SC_NOT_MODIFIED, "Not modified");
+        resp2.setHeader("Date", DateUtils.formatDate(now));
+        resp2.setHeader("Cache-Control","max-age=0");
+        resp1.setHeader("Etag", "etag");
+
+        expect(
+                mockBackend.execute(isA(HttpHost.class),
+                        isA(HttpRequest.class), (HttpContext)
+                        isNull())).andReturn(resp1);
+        expect(
+                mockBackend.execute(isA(HttpHost.class),
+                        isA(HttpRequest.class), (HttpContext)
+                        isNull())).andReturn(resp2);
+
+        replayMocks();
+        HttpResponse result1 = impl.execute(host, req1);
+        HttpResponse result2 = impl.execute(host, req2);
+        verifyMocks();
+
+        assertEquals(HttpStatus.SC_NOT_MODIFIED, result1.getStatusLine().getStatusCode());
+        assertEquals("etag", result1.getFirstHeader("Etag").getValue());
+        assertEquals(HttpStatus.SC_NOT_MODIFIED, result2.getStatusLine().getStatusCode());
+        assertEquals("etag", result2.getFirstHeader("Etag").getValue());
+    }
+
+    @Test
+    public void testNotModifiedResponseWithVaryUpdatesCacheEntryWhenNoEntity() throws Exception {
+
+        Date now = new Date();
+
+        impl = new CachingHttpClient(mockBackend);
+
+        HttpRequest req1 = new HttpGet("http://foo.example.com/");
+        req1.addHeader("If-None-Match", "etag");
+
+        HttpRequest req2 = new HttpGet("http://foo.example.com/");
+        req2.addHeader("If-None-Match", "etag");
+
+        HttpResponse resp1 = new BasicHttpResponse(HttpVersion.HTTP_1_1, HttpStatus.SC_NOT_MODIFIED, "Not modified");
+        resp1.setHeader("Date", DateUtils.formatDate(now));
+        resp1.setHeader("Cache-Control","max-age=0");
+        resp1.setHeader("Etag", "etag");
+        resp1.setHeader("Vary", "Accept-Encoding");
+
+        HttpResponse resp2 = new BasicHttpResponse(HttpVersion.HTTP_1_1, HttpStatus.SC_NOT_MODIFIED, "Not modified");
+        resp2.setHeader("Date", DateUtils.formatDate(now));
+        resp2.setHeader("Cache-Control","max-age=0");
+        resp1.setHeader("Etag", "etag");
+        resp1.setHeader("Vary", "Accept-Encoding");
+
+        expect(
+                mockBackend.execute(isA(HttpHost.class),
+                        isA(HttpRequest.class), (HttpContext)
+                        isNull())).andReturn(resp1);
+        expect(
+                mockBackend.execute(isA(HttpHost.class),
+                        isA(HttpRequest.class), (HttpContext)
+                        isNull())).andReturn(resp2);
+
+        replayMocks();
+        HttpResponse result1 = impl.execute(host, req1);
+        HttpResponse result2 = impl.execute(host, req2);
+        verifyMocks();
+
+        assertEquals(HttpStatus.SC_NOT_MODIFIED, result1.getStatusLine().getStatusCode());
+        assertEquals("etag", result1.getFirstHeader("Etag").getValue());
+        assertEquals(HttpStatus.SC_NOT_MODIFIED, result2.getStatusLine().getStatusCode());
+        assertEquals("etag", result2.getFirstHeader("Etag").getValue());
+    }
+
+    @Test
+    public void testDoesNotSend304ForNonConditionalRequest() throws Exception {
+
+        Date now = new Date();
+        Date inOneMinute = new Date(System.currentTimeMillis()+60000);
+
+        impl = new CachingHttpClient(mockBackend);
+
+        HttpRequest req1 = new HttpGet("http://foo.example.com/");
+        req1.addHeader("If-None-Match", "etag");
+
+        HttpRequest req2 = new HttpGet("http://foo.example.com/");
+
+        HttpResponse resp1 = new BasicHttpResponse(HttpVersion.HTTP_1_1, HttpStatus.SC_NOT_MODIFIED, "Not modified");
+        resp1.setHeader("Date", DateUtils.formatDate(now));
+        resp1.setHeader("Cache-Control","public, max-age=60");
+        resp1.setHeader("Expires",DateUtils.formatDate(inOneMinute));
+        resp1.setHeader("Etag", "etag");
+        resp1.setHeader("Vary", "Accept-Encoding");
+
+        HttpResponse resp2 = new BasicHttpResponse(HttpVersion.HTTP_1_1, HttpStatus.SC_OK, "Ok");
+        resp2.setHeader("Date", DateUtils.formatDate(now));
+        resp2.setHeader("Cache-Control","public, max-age=60");
+        resp2.setHeader("Expires",DateUtils.formatDate(inOneMinute));
+        resp2.setHeader("Etag", "etag");
+        resp2.setHeader("Vary", "Accept-Encoding");
+        resp2.setEntity(HttpTestUtils.makeBody(128));
+
+        expect(
+                mockBackend.execute(isA(HttpHost.class),
+                        isA(HttpRequest.class), (HttpContext)
+                        isNull())).andReturn(resp1);
+        expect(
+                mockBackend.execute(isA(HttpHost.class),
+                        isA(HttpRequest.class), (HttpContext)
+                        isNull())).andReturn(resp2);
+
+        replayMocks();
+        HttpResponse result1 = impl.execute(host, req1);
+        HttpResponse result2 = impl.execute(host, req2);
+        verifyMocks();
+
+        assertEquals(HttpStatus.SC_NOT_MODIFIED, result1.getStatusLine().getStatusCode());
+        assertNull(result1.getEntity());
+        assertEquals(HttpStatus.SC_OK, result2.getStatusLine().getStatusCode());
+        Assert.assertNotNull(result2.getEntity());
+    }
+
     private void getCacheEntryReturns(HttpCacheEntry result) throws IOException {
         expect(mockCache.getCacheEntry(host, request)).andReturn(result);
     }
@@ -2159,7 +2355,7 @@ public class TestCachingHttpClient {
                 mockSuitabilityChecker,
                 mockConditionalRequestBuilder,
                 mockResponseProtocolCompliance,
-                mockRequestProtocolCompliance).addMockedMethods(methods).createMock();
+                mockRequestProtocolCompliance).addMockedMethods(methods).createNiceMock();
     }
 
 }

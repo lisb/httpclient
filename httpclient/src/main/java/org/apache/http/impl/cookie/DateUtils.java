@@ -28,7 +28,8 @@
 package org.apache.http.impl.cookie;
 
 import java.lang.ref.SoftReference;
-import java.text.ParseException;
+import java.text.DateFormat;
+import java.text.ParsePosition;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
@@ -58,7 +59,7 @@ public final class DateUtils {
     /**
      * Date format pattern used to parse HTTP date headers in RFC 1036 format.
      */
-    public static final String PATTERN_RFC1036 = "EEEE, dd-MMM-yy HH:mm:ss zzz";
+    public static final String PATTERN_RFC1036 = "EEE, dd-MMM-yy HH:mm:ss zzz";
 
     /**
      * Date format pattern used to parse HTTP date headers in ANSI C
@@ -67,8 +68,8 @@ public final class DateUtils {
     public static final String PATTERN_ASCTIME = "EEE MMM d HH:mm:ss yyyy";
 
     private static final String[] DEFAULT_PATTERNS = new String[] {
-        PATTERN_RFC1036,
         PATTERN_RFC1123,
+        PATTERN_RFC1036,
         PATTERN_ASCTIME
     };
 
@@ -155,12 +156,10 @@ public final class DateUtils {
         for (String dateFormat : dateFormats) {
             SimpleDateFormat dateParser = DateFormatHolder.formatFor(dateFormat);
             dateParser.set2DigitYearStart(startDate);
-
-            try {
-                return dateParser.parse(dateValue);
-            } catch (ParseException pe) {
-                // ignore this exception, we will try the next format
-            }
+            ParsePosition pos = new ParsePosition(0);
+            Date result = dateParser.parse(dateValue, pos);
+            if (pos.getIndex() != 0)
+                return result;
         }
 
         // we were unable to parse the date
@@ -198,6 +197,13 @@ public final class DateUtils {
 
         SimpleDateFormat formatter = DateFormatHolder.formatFor(pattern);
         return formatter.format(date);
+    }
+
+    /**
+     * Clears thread-local variable containing {@link DateFormat} cache.
+     */
+    public static void clearThreadLocal() {
+        DateFormatHolder.clearThreadLocal();
     }
 
     /** This class should not be instantiated. */
@@ -252,6 +258,10 @@ public final class DateUtils {
             }
 
             return format;
+        }
+
+        public static void clearThreadLocal() {
+            THREADLOCAL_FORMATS.remove();
         }
 
     }

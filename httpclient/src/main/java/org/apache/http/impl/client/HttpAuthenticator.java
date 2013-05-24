@@ -64,11 +64,16 @@ public class HttpAuthenticator {
             final AuthState authState,
             final HttpContext context) {
         if (authStrategy.isAuthenticationRequested(host, response, context)) {
+            if (authState.getState() == AuthProtocolState.SUCCESS) {
+                authStrategy.authFailed(host, authState.getAuthScheme(), context);
+            }
+            this.log.debug("Authentication required");
             return true;
         } else {
             switch (authState.getState()) {
             case CHALLENGED:
             case HANDSHAKE:
+                this.log.debug("Authentication succeeded");
                 authState.setState(AuthProtocolState.SUCCESS);
                 authStrategy.authSucceeded(host, authState.getAuthScheme(), context);
                 break;

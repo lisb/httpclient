@@ -423,11 +423,13 @@ public class CachingHttpClient implements HttpClient {
         flushEntriesInvalidatedByRequest(target, request);
 
         if (!cacheableRequestPolicy.isServableFromCache(request)) {
+            log.debug("Request is not servable from cache");
             return callBackend(target, request, context);
         }
 
         HttpCacheEntry entry = satisfyFromCache(target, request);
         if (entry == null) {
+            log.debug("Cache miss");
             return handleCacheMiss(target, request, context);
         }
 
@@ -441,19 +443,25 @@ public class CachingHttpClient implements HttpClient {
         HttpResponse out = null;
         Date now = getCurrentDate();
         if (suitabilityChecker.canCachedResponseBeUsed(target, request, entry, now)) {
+            log.debug("Cache hit");
             out = generateCachedResponse(request, context, entry, now);
         } else if (!mayCallBackend(request)) {
+            log.debug("Cache entry not suitable but only-if-cached requested");
             out = generateGatewayTimeout(context);
-        } else if (validityPolicy.isRevalidatable(entry)) {
+        } else if (validityPolicy.isRevalidatable(entry)
+                && !(entry.getStatusCode() == HttpStatus.SC_NOT_MODIFIED
+                && !suitabilityChecker.isConditional(request))) {
+            log.debug("Revalidating cache entry");
             return revalidateCacheEntry(target, request, context, entry, now);
         } else {
-        	return callBackend(target, request, context);
+            log.debug("Cache entry not usable; calling backend");
+            return callBackend(target, request, context);
         }
         if (context != null) {
-        	context.setAttribute(ExecutionContext.HTTP_TARGET_HOST, target);
-        	context.setAttribute(ExecutionContext.HTTP_REQUEST, request);
-        	context.setAttribute(ExecutionContext.HTTP_RESPONSE, out);
-        	context.setAttribute(ExecutionContext.HTTP_REQ_SENT, true);
+            context.setAttribute(ExecutionContext.HTTP_TARGET_HOST, target);
+            context.setAttribute(ExecutionContext.HTTP_REQUEST, request);
+            context.setAttribute(ExecutionContext.HTTP_RESPONSE, out);
+            context.setAttribute(ExecutionContext.HTTP_REQ_SENT, true);
         }
         return out;
     }
@@ -461,12 +469,12 @@ public class CachingHttpClient implements HttpClient {
     private HttpResponse revalidateCacheEntry(HttpHost target,
             HttpRequest request, HttpContext context, HttpCacheEntry entry,
             Date now) throws ClientProtocolException {
-        log.trace("Revalidating the cache entry");
 
         try {
             if (asynchRevalidator != null
                 && !staleResponseNotAllowed(request, entry, now)
                 && validityPolicy.mayReturnStaleWhileRevalidating(entry, now)) {
+                log.trace("Serving stale with asynchronous revalidation");
                 final HttpResponse resp = generateCachedResponse(request, context, entry, now);
 
                 asynchRevalidator.revalidateCacheEntry(target, request, context, entry);
@@ -612,6 +620,7 @@ public class CachingHttpClient implements HttpClient {
         for (Header h: request.getHeaders(HeaderConstants.CACHE_CONTROL)) {
             for (HeaderElement elt : h.getElements()) {
                 if ("only-if-cached".equals(elt.getName())) {
+                    log.trace("Request marked only-if-cached");
                     return false;
                 }
             }
@@ -892,6 +901,7 @@ public class CachingHttpClient implements HttpClient {
         if (cacheable &&
             !alreadyHaveNewerCacheEntry(target, request, backendResponse)) {
             try {
+                storeRequestIfModifiedSinceFor304Response(request, backendResponse);
                 return responseCache.cacheAndReturnResponse(target, request, backendResponse, requestDate,
                         responseDate);
             } catch (IOException ioe) {
@@ -906,6 +916,24 @@ public class CachingHttpClient implements HttpClient {
             }
         }
         return backendResponse;
+    }
+
+    /**
+     * For 304 Not modified responses, adds a "Last-Modified" header with the
+     * value of the "If-Modified-Since" header passed in the request. This
+     * header is required to be able to reuse match the cache entry for
+     * subsequent requests but as defined in http specifications it is not
+     * included in 304 responses by backend servers. This header will not be
+     * included in the resulting response.
+     */
+    private void storeRequestIfModifiedSinceFor304Response(
+            HttpRequest request, HttpResponse backendResponse) {
+        if (backendResponse.getStatusLine().getStatusCode() == HttpStatus.SC_NOT_MODIFIED) {
+            Header h = request.getFirstHeader("If-Modified-Since");
+            if (h != null) {
+                backendResponse.addHeader("Last-Modified", h.getValue());
+            }
+        }
     }
 
     private boolean alreadyHaveNewerCacheEntry(HttpHost target, HttpRequest request,

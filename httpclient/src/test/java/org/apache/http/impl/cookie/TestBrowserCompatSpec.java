@@ -94,7 +94,7 @@ public class TestBrowserCompatSpec {
         Assert.assertEquals("custno", cookies.get(0).getName());
         Assert.assertEquals("12345", cookies.get(0).getValue());
         Assert.assertEquals("test", cookies.get(0).getComment());
-        Assert.assertEquals(0, cookies.get(0).getVersion());
+        Assert.assertEquals(1, cookies.get(0).getVersion());
         Assert.assertEquals("www.apache.org", cookies.get(0).getDomain());
         Assert.assertEquals("/", cookies.get(0).getPath());
         Assert.assertFalse(cookies.get(0).isSecure());
@@ -102,7 +102,7 @@ public class TestBrowserCompatSpec {
         Assert.assertEquals("name", cookies.get(1).getName());
         Assert.assertEquals("John", cookies.get(1).getValue());
         Assert.assertEquals(null, cookies.get(1).getComment());
-        Assert.assertEquals(0, cookies.get(1).getVersion());
+        Assert.assertEquals(1, cookies.get(1).getVersion());
         Assert.assertEquals(".apache.org", cookies.get(1).getDomain());
         Assert.assertEquals("/", cookies.get(1).getPath());
         Assert.assertTrue(cookies.get(1).isSecure());
@@ -130,7 +130,7 @@ public class TestBrowserCompatSpec {
         Assert.assertEquals("custno", cookies.get(0).getName());
         Assert.assertEquals("12345", cookies.get(0).getValue());
         Assert.assertEquals("test", cookies.get(0).getComment());
-        Assert.assertEquals(0, cookies.get(0).getVersion());
+        Assert.assertEquals(1, cookies.get(0).getVersion());
         Assert.assertEquals("www.apache.org", cookies.get(0).getDomain());
         Assert.assertEquals("/", cookies.get(0).getPath());
         Assert.assertFalse(cookies.get(0).isSecure());
@@ -138,7 +138,7 @@ public class TestBrowserCompatSpec {
         Assert.assertEquals("name", cookies.get(1).getName());
         Assert.assertEquals("John", cookies.get(1).getValue());
         Assert.assertEquals(null, cookies.get(1).getComment());
-        Assert.assertEquals(0, cookies.get(1).getVersion());
+        Assert.assertEquals(1, cookies.get(1).getVersion());
         Assert.assertEquals(".apache.org", cookies.get(1).getDomain());
         Assert.assertEquals("/", cookies.get(1).getPath());
         Assert.assertTrue(cookies.get(1).isSecure());
@@ -166,7 +166,7 @@ public class TestBrowserCompatSpec {
         Assert.assertEquals("name", cookies.get(0).getName());
         Assert.assertEquals("Doe, John", cookies.get(0).getValue());
         Assert.assertEquals(null, cookies.get(0).getComment());
-        Assert.assertEquals(0, cookies.get(0).getVersion());
+        Assert.assertEquals(1, cookies.get(0).getVersion());
         Assert.assertEquals(".apache.org", cookies.get(0).getDomain());
         Assert.assertEquals("/", cookies.get(0).getPath());
         Assert.assertTrue(cookies.get(0).isSecure());
@@ -458,7 +458,7 @@ public class TestBrowserCompatSpec {
         Assert.assertTrue("Secure",cookies.get(0).isSecure());
         Assert.assertEquals(new Date(10000L),cookies.get(0).getExpiryDate());
         Assert.assertEquals("Comment","This is a comment.",cookies.get(0).getComment());
-        Assert.assertEquals("Version",0,cookies.get(0).getVersion());
+        Assert.assertEquals("Version",1,cookies.get(0).getVersion());
     }
 
     @Test
@@ -996,6 +996,58 @@ public class TestBrowserCompatSpec {
         } catch (IllegalArgumentException ex) {
             // expected
         }
+    }
+
+    /**
+     * Tests cookie version 1 with space in cookie value.
+     */
+    @Test
+    public void testFormatCookieWithSpaceInValue() throws Exception {
+        CookieOrigin origin = new CookieOrigin("myhost.mydomain.com", 80, "/", false);
+        CookieSpec cookieSpec = new BrowserCompatSpec();
+        Header setCookieHeader = new BasicHeader("Set-Cookie", "test=\"value 1\"; Version=1");
+        Cookie cookie = cookieSpec.parse(setCookieHeader, origin).get(0);
+        List<Cookie> cookies = new ArrayList<Cookie>();
+        cookies.add(cookie);
+        List<Header> headers = cookieSpec.formatCookies(cookies);
+        Assert.assertNotNull(headers);
+        Assert.assertEquals(1, headers.size());
+        Assert.assertEquals("test=\"value 1\"", headers.get(0).getValue());
+    }
+
+    /**
+     * Tests Netscape cookie with space in cookie value.
+     */
+    @Test
+    public void testFormatCookieVersion0WithSpaceInValue() throws Exception {
+        CookieOrigin origin = new CookieOrigin("myhost.mydomain.com", 80, "/", false);
+        CookieSpec cookieSpec = new BrowserCompatSpec();
+        Header setCookieHeader = new BasicHeader("Set-Cookie", "test=value 1");
+        Cookie cookie = cookieSpec.parse(setCookieHeader, origin).get(0);
+        List<Cookie> cookies = new ArrayList<Cookie>();
+        cookies.add(cookie);
+        List<Header> headers = cookieSpec.formatCookies(cookies);
+        Assert.assertNotNull(headers);
+        Assert.assertEquals(1, headers.size());
+        Assert.assertEquals("test=value 1", headers.get(0).getValue());
+    }
+
+    @Test
+    public void testVersion1CookieWithInvalidExpires() throws Exception {
+        final CookieSpec cookiespec = new BrowserCompatSpec();
+        final CookieOrigin origin = new CookieOrigin("myhost.mydomain.com", 80, "/", false);
+
+        final Header origHeader = new BasicHeader("Set-Cookie",
+            "test=\"test\"; Version=1; Expires=Mon, 11-Feb-2013 10:39:19 GMT; Path=/");
+        final List<Cookie> cookies = cookiespec.parse(origHeader, origin);
+        Assert.assertNotNull(cookies);
+        Assert.assertEquals(1, cookies.size());
+
+        final List<Header> headers = cookiespec.formatCookies(cookies);
+        Assert.assertNotNull(headers);
+        Assert.assertEquals(1, headers.size());
+        final Header header1 = headers.get(0);
+        Assert.assertEquals("test=\"test\"", header1.getValue());
     }
 
 }

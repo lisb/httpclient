@@ -1,3 +1,212 @@
+Release 4.2.5
+-------------------
+
+HttpClient 4.2.5 (GA) is a maintenance release that addresses a number of issues reported since 
+release 4.2.3 including a major bug that can lead to re-use of persistent connections in 
+ a inconsistent state.
+
+All users of HttpClient 4.2 are strongly advised to upgrade.
+  
+
+Changelog
+-------------------
+
+* [HTTPCLIENT-1341] DeflateDecompressingEntity does not call Inflater#end.
+  Contributed by Oleg Kalnichevski <olegk at apache.org>
+
+* [HTTPCLIENT-1299] (regression) cache incorrectly disposes of the underlying cache resource 
+  when storing variant entry.
+  Contributed by James Leigh <james at 3roundstones.com> 
+
+* [HTTPCLIENT-1342] Redirects with underscore character in the location hostname cause
+  "java.lang.IllegalArgumentException: Host name may not be null".  
+  Contributed by Oleg Kalnichevski <olegk at apache.org>
+
+* [HTTPCLIENT-1338] (regression) Invalidated / stale DIGEST schemes do not get evicted from
+  the auth cache. 
+  Contributed by Oleg Kalnichevski <olegk at apache.org>
+
+* [HTTPCLIENT-1340] Connection re-used in a inconsistent state despite presence of 
+  'Connection: close' response header immediately after a successful authentication exchange. 
+  Contributed by Oleg Kalnichevski <olegk at apache.org>
+
+
+Release 4.2.4
+-------------------
+
+HttpClient 4.2.4 (GA) is a maintenance release that addresses a number of issues reported since 
+release 4.2.3. 
+
+Changelog
+-------------------
+
+* [HTTPCLIENT-1319] InetAddressUtils.isIPv6HexCompressedAddress does not detect excess groups 
+  Contributed Sebastian Bazley <sebb at apache.org>.
+
+* [HTTPCLIENT-1299] (regression) cache incorrectly disposes of the underlying cache resource 
+  when storing variant entry.
+  Contributed by Oleg Kalnichevski <olegk at apache.org>
+
+* [HTTPCLIENT-1320] Leverage javax.net.ssl.SSLSocketFactory#getDefault() to initialize SSL context 
+  based on system defaults instead of using an internal custom routine.
+  Contributed by Abe Backus <abraham at backus.com> and Oleg Kalnichevski <olegk at apache.org>
+
+* [HTTPCLIENT-1315] NTLM support did not work properly when the target (as returned
+  in the Type 2 message) differed from the domain as supplied by the user.
+  Contributed by Karl Wright <kwright at apache.org>
+
+* PoolingClientConnectionManager does not use ClientConnectionOperator#createConnection() 
+  method to create new connections.
+  Contributed by Oleg Kalnichevski <olegk at apache.org>
+
+* [HTTPCLIENT-1311] Interrupt flag is not preserved where InterruptedException is caught.
+  Contributed by Oleg Kalnichevski <olegk at apache.org>
+
+* [HTTPCLIENT-1312] Zero length content entities with a Content-Encoding header cause 
+  an I/O error when an attempt is made to consume such entity.
+  Contributed by Oleg Kalnichevski <olegk at apache.org>
+
+* [HTTPCLIENT-1305] Ensure chunking is disabled when applying Base64 encoding.
+  Contributed by Oleg Kalnichevski <olegk at apache.org>
+
+
+
+Release 4.2.3
+-------------------
+
+HttpClient 4.2.3 (GA) is a bug fix release that addresses a number of issues reported since 
+release 4.2.2. This release also includes a thoroughly reworked NTLM authentication engine 
+which should result in a better compatibility with the newest Microsoft products. 
+
+Users of HttpClient 4.x are advised to upgrade.
+
+Changelog
+-------------------
+
+* [HTTPCLIENT-1296] NPE gets thrown if you combine a default host with a virtual host
+  that has a -1 value for the port.
+  Contributed by Karl Wright <daddywri at gmail.com>
+
+* [HTTPCLIENT-1290] 304 cached response never reused with If-modified-since conditional 
+  requests. 
+  Contributed by Francois-Xavier Bonnet <francois-xavier.bonnet at centraliens.net>
+
+* [HTTPCLIENT-1291] Absolute request URIs without an explicitly specified path are rewritten 
+  to have "/" path).  
+  Contributed by Oleg Kalnichevski <olegk at apache.org>
+
+* [HTTPCLIENT-1286] Request URI rewriting is inconsistent - URI fragments are not removed 
+  from absolute request URIs.  
+  Contributed by Oleg Kalnichevski <olegk at apache.org>
+
+* [HTTPCLIENT-1284] HttpClient incorrectly generates Host header when physical connection
+  route differs from the host name specified in the request URI. 
+  Contributed by Oleg Kalnichevski <olegk at apache.org>
+
+* [HTTPCLIENT-1293] Kerberos and SPNego auth schemes use incorrect authorization header name 
+  when authenticating with a proxy.
+  Contributed by Oleg Kalnichevski <olegk at apache.org>
+
+* [HTTPCLIENT-1283] NTLM needs to use Locale-independent form of
+  toUpperCase().
+  Contributed by Karl Wright <DaddyWri at gmail.com>  
+
+* [HTTPCLIENT-1279] Target host responding with status 407 (proxy authentication required) 
+  causes an NPE. 
+  Contributed by Oleg Kalnichevski <olegk at apache.org>
+
+* [HTTPCLIENT-1281] GzipDecompressingEntity does not release InputStream when an IOException 
+  occurs while reading the Gzip header 
+  Contributed by Francois-Xavier Bonnet <francois-xavier.bonnet at centraliens.net> 
+
+* [HTTPCLIENT-1277] Caching client sends a 304 to an unconditional request.
+  Contributed by Francois-Xavier Bonnet <francois-xavier.bonnet at centraliens.net>
+
+* [HTTPCLIENT-1278] Update NTLM documentation.
+  Contributed by Karl Wright <DaddyWri at gmail.com>  
+
+* SystemDefaultHttpClient misinterprets 'http.keepAlive' default value and disables
+  connection persistence if the system property is not set. This causes connection
+  based authentication schemes such as NTLM to fail.
+
+* [HTTPCLIENT-1276] cache update on a 304 response causes NPE. 
+  Contributed by Francois-Xavier Bonnet <francois-xavier.bonnet at centraliens.net> 
+
+* [HTTPCLIENT-1273] DecompressingHttpClient does not automatically consume response 
+  content in case of an i/o, HTTP or runtime exception thrown by the decompressing 
+  protocol interceptor leading to a potential connection leak. 
+  Contributed by Oleg Kalnichevski <olegk at apache.org>
+
+* [HTTPCLIENT-1268] NTLM engine refactor fix, to correct a buffer overrun, and get NTLMv2
+  flags right.
+  Contributed by Karl Wright <DaddyWri at gmail.com>  
+
+* [HTTPCLIENT-1266] NTLM engine refactoring and compatibility improvements.
+  Contributed by Karl Wright <DaddyWri at gmail.com>  
+
+* [HTTPCLIENT-1263] BrowserCompatSpec: attribute values containing spaces or special characters 
+  should be enclosed with quotes marks for version 1 cookies.
+  Contributed by Francois-Xavier Bonnet <francois-xavier.bonnet at centraliens.net> 
+
+* [HTTPCLIENT-1263] CachingHttpClient fails to release connections back to the connection
+  manager for some type of HTTP response messages when used together with DecompressingHttpClient.  
+  Contributed by Francois-Xavier Bonnet <francois-xavier.bonnet at centraliens.net> 
+
+* [HTTPCLIENT-1258] Fixed NullPointerException in NTLMEngineImpl caused by null NT domain
+  attribute.
+  Contributed by Oleg Kalnichevski <olegk at apache.org>
+
+* [HTTPCLIENT-1254] Redirect with underscore in hostname causes ProtocolException.
+  Contributed by Oleg Kalnichevski <olegk at apache.org>
+
+* [HTTPCLIENT-1255] AbstractVerifier incorrectly parses certificate CN containing wildcard.
+  Contributed by Oleg Kalnichevski <olegk at apache.org>
+
+
+
+Release 4.2.2 
+-------------------
+
+HttpClient 4.2.2 (GA) is a bug fix release that addresses a number of issues reported since 
+release 4.2.1.
+
+Users of HttpClient 4.2 are advised to upgrade.
+
+Changelog
+-------------------
+
+* [HTTPCLIENT-1248] Default and lax redirect strategies should not convert requests redirected
+  with 307 status to GET method.  
+  Contributed by Oleg Kalnichevski <olegk at apache.org>
+
+* [HTTPCLIENT-1215] BasicAuthCache does not take default ports into consideration when
+  looking up cached authentication details by HttpHost key.
+  Contributed by Oleg Kalnichevski <olegk at apache.org>
+
+* [HTTPCLIENT-1241] (regression) Preemptive BASIC authentication failure should be considered 
+  final and no further attempts to re-authenticate using the same credentials should be made. 
+  Contributed by Oleg Kalnichevski <olegk at apache.org>
+
+* [HTTPCLIENT-1229] Fixed NPE in BasicClientConnectionManager that can be triggered by releasing
+  connection after the connection manager has already been shut down. 
+  Contributed by Oleg Kalnichevski <olegk at apache.org>
+
+* [HTTPCLIENT-1227] Date parsing in DateUtils made more efficient.
+  Contributed by Patrick Linskey <pcl at apache.org>
+
+* [HTTPCLIENT-1224] (regression) NTLM auth not retried after a redirect over a non-persistent 
+  connection.
+  Contributed by Oleg Kalnichevski <olegk at apache.org>
+
+* [HTTPCLIENT-1223] Cache could be more aggressive on cache invalidations
+  from Content-Location. Contributed by Jon Moore <jonm at apache.org>.
+  Contributed by Jon Moore <jonm at apache.org>
+
+* [HTTPCLIENT-1217] AutoRetryHttpClient does not release connection used by the previous response 
+  when request is retried
+  Contributed by Oleg Kalnichevski <olegk at apache.org>
+
+
 Release 4.2.1 
 -------------------
 

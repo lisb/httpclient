@@ -24,36 +24,39 @@
  * <http://www.apache.org/>.
  *
  */
-package org.apache.http.impl.client.cache;
 
-import java.io.ByteArrayInputStream;
+package org.apache.http.impl.client;
 
-import org.apache.http.client.cache.Resource;
-import org.apache.http.util.EntityUtils;
-import org.easymock.classextension.EasyMock;
+import org.apache.http.HttpHost;
+import org.apache.http.auth.AuthScheme;
 import org.junit.Assert;
 import org.junit.Test;
+import org.mockito.Mockito;
 
-public class TestCombinedEntity {
+/**
+ * Unit tests for {@link BasicAuthCache}.
+ */
+public class TestBasicAuthCache {
 
     @Test
-    public void testCombinedEntityBasics() throws Exception {
-        Resource resource = EasyMock.createNiceMock(Resource.class);
-        EasyMock.expect(resource.getInputStream()).andReturn(
-                new ByteArrayInputStream(new byte[] { 1, 2, 3, 4, 5 }));
-        resource.dispose();
-        EasyMock.replay(resource);
+    public void testBasics() throws Exception {
+        BasicAuthCache cache = new BasicAuthCache();
+        AuthScheme authScheme = Mockito.mock(AuthScheme.class);
+        cache.put(new HttpHost("localhost", 80), authScheme);
+        Assert.assertSame(authScheme, cache.get(new HttpHost("localhost", 80)));
+        cache.remove(new HttpHost("localhost", 80));
+        Assert.assertNull(cache.get(new HttpHost("localhost", 80)));
+        cache.put(new HttpHost("localhost", 80), authScheme);
+        cache.clear();
+        Assert.assertNull(cache.get(new HttpHost("localhost", 80)));
+    }
 
-        ByteArrayInputStream instream = new ByteArrayInputStream(new byte[] { 6, 7, 8, 9, 10 });
-        CombinedEntity entity = new CombinedEntity(resource, instream);
-        Assert.assertEquals(-1, entity.getContentLength());
-        Assert.assertFalse(entity.isRepeatable());
-        Assert.assertTrue(entity.isStreaming());
-
-        byte[] result = EntityUtils.toByteArray(entity);
-        Assert.assertArrayEquals(new byte[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 }, result);
-
-        EasyMock.verify(resource);
+    @Test
+    public void testGetKey() throws Exception {
+        BasicAuthCache cache = new BasicAuthCache();
+        HttpHost target = new HttpHost("localhost", 443, "https");
+        Assert.assertSame(target, cache.getKey(target));
+        Assert.assertEquals(target, cache.getKey(new HttpHost("localhost", -1, "https")));
     }
 
 }
