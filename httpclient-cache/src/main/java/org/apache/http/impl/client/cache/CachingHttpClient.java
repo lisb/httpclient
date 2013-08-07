@@ -952,6 +952,12 @@ public class CachingHttpClient implements HttpClient {
         return responseDate.before(entryDate);
     }
     
+    public void flushCache(final HttpUriRequest request) {
+    	URI uri = request.getURI();
+        HttpHost httpHost = new HttpHost(uri.getHost(), uri.getPort(), uri.getScheme());
+    	flushCache(httpHost, request);
+    }
+    
     public void flushCache(final HttpHost host, final HttpRequest request) {
     	try {
     		responseCache.flushCacheEntriesFor(host, request);
