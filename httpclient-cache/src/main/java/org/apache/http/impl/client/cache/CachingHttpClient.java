@@ -951,5 +951,13 @@ public class CachingHttpClient implements HttpClient {
         if (responseDate == null) return false;
         return responseDate.before(entryDate);
     }
+    
+    public void flushCache(final HttpHost host, final HttpRequest request) {
+    	try {
+    		responseCache.flushCacheEntriesFor(host, request);
+    	} catch (IOException ioe) {
+    		log.warn("Unable to flush cache entry.", ioe);
+    	}
+    }
 
 }
